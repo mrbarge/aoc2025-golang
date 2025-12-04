@@ -22,14 +22,14 @@ func joltage(line []int) (r int) {
 
 func joltageTwo(line []int) (r int) {
 	largest := make([]int, 0)
-	for i := 0; i < len(line)-12; i++ {
+	for i := 0; i <= len(line)-12; i++ {
 		currPos := i
 		jolt := line[currPos] * int(math.Pow10(11))
 		for digitsRemaining := 11; digitsRemaining > 0; digitsRemaining-- {
 			// scan forward - look for the closest, largest digit between i and len-digitsRemaining
 			largestNext := line[currPos+1]
 			largestPos := currPos + 1
-			for j := currPos + 1; j < len(line)-digitsRemaining; j++ {
+			for j := currPos + 1; j <= len(line)-digitsRemaining; j++ {
 				if line[j] > largestNext {
 					largestNext = line[j]
 					largestPos = j
@@ -51,6 +51,14 @@ func partOne(lines [][]int) (r int, err error) {
 	return r, nil
 }
 
+func partTwo(lines [][]int) (r int64, err error) {
+	for _, line := range lines {
+		ans := joltageTwo(line)
+		r += int64(ans)
+	}
+	return r, nil
+}
+
 func main() {
 	fh, _ := os.Open("input.txt")
 	lines, err := helper.ReadLinesAsIntArray(fh)
@@ -62,7 +70,7 @@ func main() {
 	ans, err := partOne(lines)
 	fmt.Printf("Part one: %d\n", ans)
 
-	//ans, err = partTwo(lines[0])
-	//fmt.Printf("Part two: %d\n", ans)
+	ans2, err := partTwo(lines)
+	fmt.Printf("Part two: %d\n", ans2)
 
 }
