@@ -288,3 +288,9 @@ func ParseCoord(s string) Coord {
 func ManhattanDistance(c1 Coord, c2 Coord) int {
 	return int(math.Abs(float64(c1.X-c2.X)) + math.Abs(float64(c1.Y-c2.Y)))
 }
+
+func (c Coord) Area(i Coord) int {
+	width := math.Abs(float64(c.X-i.X)) + 1
+	height := math.Abs(float64(c.Y-i.Y)) + 1
+	return int(width * height)
+}
