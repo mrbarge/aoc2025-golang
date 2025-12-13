@@ -11,9 +11,10 @@ import (
 )
 
 type Machine struct {
-	Expected     []bool
-	State        []bool
-	Instructions []Instruction
+	Expected        []bool
+	State           []bool
+	Instructions    []Instruction
+	JoltRequirement []int
 }
 
 type State struct {
@@ -21,12 +22,9 @@ type State struct {
 	Turns      int
 }
 
-func (m Machine) ApplyInstruction(instruction Instruction) []bool {
-	r := slices.Clone(m.State)
-	for _, pos := range instruction {
-		r[pos] = !r[pos]
-	}
-	return r
+type StateTwo struct {
+	JoltState []int
+	Turns     int
 }
 
 type Instruction []int
@@ -43,13 +41,12 @@ func stateAsKey(i []bool) (r string) {
 	return r
 }
 
-func (m Machine) Done() bool {
-	return slices.Equal(m.State, m.Expected)
-}
-
-func (m Machine) Set(pos int) bool {
-	m.State[pos] = !m.State[pos]
-	return m.Expected[pos] == m.State[pos]
+func stateAsKeyTwo(i []int) (r string) {
+	r = ""
+	for _, v := range i {
+		r += strconv.Itoa(v)
+	}
+	return r
 }
 
 func readMachine(line string) (r Machine) {
@@ -79,10 +76,14 @@ func readMachine(line string) (r Machine) {
 		r.Instructions = append(r.Instructions, i)
 	}
 
-	return r
-}
+	lp = strings.Index(line, "{")
+	rp = strings.Index(line, "}")
+	js := line[lp+1 : rp]
+	for _, j := range strings.Split(js, ",") {
+		jolt, _ := strconv.Atoi(j)
+		r.JoltRequirement = append(r.JoltRequirement, jolt)
+	}
 
-func readInstructions(line string) (r []Instruction) {
 	return r
 }
 
@@ -93,6 +94,15 @@ func readData(lines []string) (m []Machine) {
 		m = append(m, machine)
 	}
 	return m
+}
+
+func (m Machine) InvalidNextState(s []int) bool {
+	for i, v := range s {
+		if v > m.JoltRequirement[i] {
+			return true
+		}
+	}
+	return false
 }
 
 func (m Machine) Simulate() int {
@@ -121,10 +131,47 @@ func (m Machine) Simulate() int {
 	return -1
 }
 
+func (m Machine) SimulateTwo() int {
+	queue := []StateTwo{{JoltState: make([]int, len(m.JoltRequirement)), Turns: 0}}
+	visited := make(map[string]bool)
+
+	for len(queue) > 0 {
+		next := queue[0]
+		queue = queue[1:]
+
+		if slices.Equal(m.JoltRequirement, next.JoltState) {
+			return next.Turns
+		}
+
+		for _, instruction := range m.Instructions {
+			stateTurn := slices.Clone(next.JoltState)
+			for _, pos := range instruction {
+				stateTurn[pos] += 1
+			}
+			if !m.InvalidNextState(stateTurn) {
+				stateKey := stateAsKeyTwo(stateTurn)
+				if _, ok := visited[stateKey]; !ok {
+					visited[stateKey] = true
+					queue = append(queue, StateTwo{JoltState: slices.Clone(stateTurn), Turns: next.Turns + 1})
+				}
+			}
+		}
+	}
+	return -1
+}
+
 func partOne(lines []string) (r int, err error) {
 	machines := readData(lines)
 	for _, machine := range machines {
 		r += machine.Simulate()
+	}
+	return r, err
+}
+
+func partTwo(lines []string) (r int, err error) {
+	machines := readData(lines)
+	for _, machine := range machines {
+		r += machine.SimulateTwo()
 	}
 	return r, err
 }
@@ -140,7 +187,7 @@ func main() {
 	ans, err := partOne(lines)
 	fmt.Printf("Part one: %d\n", ans)
 
-	//ans, err = partTwo(lines)
-	//fmt.Printf("Part two: %d\n", ans)
+	ans, err = partTwo(lines)
+	fmt.Printf("Part two: %d\n", ans)
 
 }
