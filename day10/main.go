@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"slices"
 	"strconv"
@@ -12,11 +11,37 @@ import (
 )
 
 type Machine struct {
-	Expected []bool
-	State    []bool
+	Expected     []bool
+	State        []bool
+	Instructions []Instruction
+}
+
+type State struct {
+	LightState []bool
+	Turns      int
+}
+
+func (m Machine) ApplyInstruction(instruction Instruction) []bool {
+	r := slices.Clone(m.State)
+	for _, pos := range instruction {
+		r[pos] = !r[pos]
+	}
+	return r
 }
 
 type Instruction []int
+
+func stateAsKey(i []bool) (r string) {
+	r = ""
+	for _, v := range i {
+		if v {
+			r += "#"
+		} else {
+			r += "."
+		}
+	}
+	return r
+}
 
 func (m Machine) Done() bool {
 	return slices.Equal(m.State, m.Expected)
@@ -25,12 +50,6 @@ func (m Machine) Done() bool {
 func (m Machine) Set(pos int) bool {
 	m.State[pos] = !m.State[pos]
 	return m.Expected[pos] == m.State[pos]
-}
-
-func runInstruction(m *Machine, instruction []int) {
-	for _, pos := range instruction {
-		m.Set(pos)
-	}
 }
 
 func readMachine(line string) (r Machine) {
@@ -44,11 +63,7 @@ func readMachine(line string) (r Machine) {
 		}
 		r.State = append(r.State, false)
 	}
-	return r
-}
 
-func readInstructions(line string) (r []Instruction) {
-	r = make([]Instruction, 0)
 	elems := strings.Split(line, " ")
 	for _, elem := range elems {
 		if strings.Contains(elem, "[") || strings.Contains(elem, "{") {
@@ -59,62 +74,63 @@ func readInstructions(line string) (r []Instruction) {
 		for _, num := range nums {
 			inum, _ := strconv.Atoi(num)
 			i = append(i, inum)
+
 		}
-		r = append(r, i)
+		r.Instructions = append(r.Instructions, i)
 	}
+
 	return r
 }
 
-func readData(lines []string) (m []Machine, i [][]Instruction) {
-	i = make([][]Instruction, 0)
-	m = make([]Machine, 0)
-	for _, line := range lines {
-		inst := readInstructions(line)
-		machine := readMachine(line)
-
-		m = append(m, machine)
-		i = append(i, inst)
-	}
-	return m, i
+func readInstructions(line string) (r []Instruction) {
+	return r
 }
 
-func simulate(state []bool, expected []bool, turns int, i []Instruction) int {
-	// Are we there yet
-	if slices.Equal(state, expected) {
-		return turns
+func readData(lines []string) (m []Machine) {
+	m = make([]Machine, 0)
+	for _, line := range lines {
+		machine := readMachine(line)
+		m = append(m, machine)
 	}
+	return m
+}
 
-	minturns := math.MaxInt
-	for _, inst := range i {
-		closer := false
-		newstate := slices.Clone(state)
-		for _, pos := range inst {
-			newstate[pos] = !newstate[pos]
-			closer = closer || newstate[pos] == expected[pos]
+func (m Machine) Simulate() int {
+	queue := []State{{LightState: slices.Clone(m.State), Turns: 0}}
+	visited := make(map[string]bool)
+
+	for len(queue) > 0 {
+		next := queue[0]
+		queue = queue[1:]
+
+		if slices.Equal(next.LightState, m.Expected) {
+			return next.Turns
 		}
-		// did this bring us any closer
-		if closer {
-			nt := simulate(newstate, expected, turns+1, i)
-			if nt < minturns {
-				minturns = nt
+		for _, instruction := range m.Instructions {
+			stateTurn := slices.Clone(next.LightState)
+			for _, pos := range instruction {
+				stateTurn[pos] = !stateTurn[pos]
+			}
+			stateKey := stateAsKey(stateTurn)
+			if _, ok := visited[stateKey]; !ok {
+				visited[stateKey] = true
+				queue = append(queue, State{LightState: slices.Clone(stateTurn), Turns: next.Turns + 1})
 			}
 		}
 	}
-	return minturns
+	return -1
 }
 
 func partOne(lines []string) (r int, err error) {
-	machines, instructions := readData(lines)
-	for i, machine := range machines {
-		mi := instructions[i]
-		turns := simulate(machine.State, machine.Expected, 0, mi)
-		fmt.Printf("turns: %d\n", turns)
+	machines := readData(lines)
+	for _, machine := range machines {
+		r += machine.Simulate()
 	}
 	return r, err
 }
 
 func main() {
-	fh, _ := os.Open("test.txt")
+	fh, _ := os.Open("input.txt")
 	lines, err := helper.ReadLines(fh, true)
 	if err != nil {
 		fmt.Printf("Unable to read input: %v\n", err)
