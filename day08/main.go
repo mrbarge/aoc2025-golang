@@ -18,14 +18,15 @@ type JunctionBox struct {
 	Connections []*JunctionBox
 	Circuits    []*Circuit
 }
+
+type Connection struct {
+	Distance int
+	Boxes    [2]*JunctionBox
+}
+
 type Circuit struct {
 	Id    int
 	Boxes []*JunctionBox
-}
-
-type ClosestPair struct {
-	Boxes    []*JunctionBox
-	Distance float64
 }
 
 func (c *Circuit) HasBox(jb *JunctionBox) bool {
@@ -57,119 +58,77 @@ func readData(lines []string) (r []*JunctionBox) {
 	return r
 }
 
-func (jb *JunctionBox) FindClosest(boxes []*JunctionBox) (*JunctionBox, float64) {
-	distance := math.MaxFloat64
-	var closest *JunctionBox
-	for _, b := range boxes {
-		// Ignore boxes we're already connected to
-		if jb.IsConnectedTo(b) {
-			continue
-		}
-		d := jb.C.DistanceTo(b.C)
-		if d < distance {
-			distance = d
-			closest = b
+func makeDistances(boxes []*JunctionBox) []Connection {
+	distances := make([]Connection, 0)
+	for i, b1 := range boxes {
+		for _, b2 := range boxes[i+1:] {
+			distance := b1.C.DistanceTo(b2.C)
+			distances = append(distances, Connection{
+				Distance: distance,
+				Boxes:    [2]*JunctionBox{b1, b2},
+			})
 		}
 	}
-	return closest, distance
+	sort.Slice(distances, func(i, j int) bool {
+		return distances[i].Distance < distances[j].Distance
+	})
+	return distances
 }
 
-func (jb *JunctionBox) IsConnectedTo(box *JunctionBox) bool {
-	if jb.Connections == nil || len(jb.Connections) == 0 {
-		return false
+func makeCircuits(boxes []*JunctionBox) map[int]*Circuit {
+	r := make(map[int]*Circuit, 0)
+	for i, b := range boxes {
+		r[i] = &Circuit{Id: i, Boxes: []*JunctionBox{b}}
 	}
-	return slices.Contains(jb.Connections, box)
+	return r
 }
 
-func (jb *JunctionBox) ConnectTo(box *JunctionBox) {
-	jb.Connections = append(jb.Connections, box)
-	box.Connections = append(box.Connections, jb)
+func getBoxCircuit(circuits map[int]*Circuit, box *JunctionBox) *Circuit {
+	for _, c := range circuits {
+		if c.HasBox(box) {
+			return c
+		}
+	}
+	return nil
 }
 
 func partOne(lines []string, connections int) (r int, err error) {
 	boxes := readData(lines)
-	circuits := make([]*Circuit, 0)
-	circuitId := 0
-	connectionsMade := 0
-	for connectionsMade < connections {
-		closestPair := ClosestPair{Boxes: make([]*JunctionBox, 0), Distance: math.MaxFloat64}
-		for j, box := range boxes {
-			otherboxes := make([]*JunctionBox, 0)
-			otherboxes = append(otherboxes, boxes[:j]...)
-			otherboxes = append(otherboxes, boxes[j+1:]...)
-			closest, dist := box.FindClosest(otherboxes)
-			if dist < closestPair.Distance {
-				closestPair.Boxes = []*JunctionBox{box, closest}
-				closestPair.Distance = dist
-			}
-		}
-		//fmt.Printf("Connecting %v and %v\n", closestPair.Boxes[0].Id, closestPair.Boxes[1].Id)
+	distances := makeDistances(boxes)
+	circuits := makeCircuits(boxes)
 
-		// Connect the two
-		closestPair.Boxes[0].ConnectTo(closestPair.Boxes[1])
-		connectionsMade++
+	p2Answer := 0
+	for connections > 0 && len(circuits) > 1 {
 
-		// Is there a circuit they are part of?
-		boxCircuits := make(map[int]*Circuit)
-		for _, circuit := range circuits {
-			if circuit.HasBox(closestPair.Boxes[0]) {
-				boxCircuits[closestPair.Boxes[0].Id] = circuit
-			}
-			if circuit.HasBox(closestPair.Boxes[1]) {
-				boxCircuits[closestPair.Boxes[1].Id] = circuit
-			}
-		}
+		closest := distances[0]
+		distances = distances[1:]
+		p2Answer = closest.Boxes[0].C.X * closest.Boxes[1].C.X
 
-		if len(boxCircuits) > 1 {
-			if boxCircuits[closestPair.Boxes[0].Id] != boxCircuits[closestPair.Boxes[1].Id] {
-				// Merge circuits
-				for _, jb := range boxCircuits[closestPair.Boxes[1].Id].Boxes {
-					boxCircuits[closestPair.Boxes[0].Id].AddBox(jb)
-				}
-				// Remove the stale circuit
-				newCircuits := make([]*Circuit, 0)
-				for _, j := range circuits {
-					if j.Id != closestPair.Boxes[1].Id {
-						newCircuits = append(newCircuits, j)
-					}
-				}
-				circuits = newCircuits
-			} else {
-				// Same circuit, do nothing
+		b1Circuit := getBoxCircuit(circuits, closest.Boxes[0])
+		b2Circuit := getBoxCircuit(circuits, closest.Boxes[1])
+
+		if b1Circuit != b2Circuit {
+			// Merge and remove the second circuit
+			for _, b := range b2Circuit.Boxes {
+				b1Circuit.AddBox(b)
 			}
-		} else if len(boxCircuits) == 1 {
-			// Circuit needs to contain both boxes
-			for _, circuit := range boxCircuits {
-				circuit.AddBox(closestPair.Boxes[0])
-				circuit.AddBox(closestPair.Boxes[1])
-			}
-		} else {
-			// Creating a new circuit baybeeeeeeeeeee
-			circuits = append(circuits, &Circuit{Id: circuitId, Boxes: []*JunctionBox{closestPair.Boxes[0], closestPair.Boxes[1]}})
-			//fmt.Printf("Creating new circuit %v..\n", circuitId)
-			circuitId++
+			delete(circuits, b2Circuit.Id)
 		}
-		//printLengths(circuits)
+		connections--
 	}
 
-	circuitSizes := make([]int, 0)
+	circuitLengths := make([]int, 0)
 	for _, circuit := range circuits {
-		//fmt.Printf("Circuit %v is %v\n", i, len(circuit.Boxes))
-		circuitSizes = append(circuitSizes, len(circuit.Boxes))
+		circuitLengths = append(circuitLengths, len(circuit.Boxes))
 	}
-	sort.Ints(circuitSizes)
-	return circuitSizes[len(circuitSizes)-1] * circuitSizes[len(circuitSizes)-2] * circuitSizes[len(circuitSizes)-3], nil
-}
 
-func printLengths(l []*Circuit) {
-	for _, circuit := range l {
-		fmt.Printf("%v [", len(circuit.Boxes))
-		for _, b := range circuit.Boxes {
-			fmt.Printf("%v ", b.Id)
-		}
-		fmt.Printf("] ")
+	// crude part 1 or part 2 test
+	if len(circuitLengths) > 1 {
+		sort.Ints(circuitLengths)
+		return circuitLengths[len(circuitLengths)-1] * circuitLengths[len(circuitLengths)-2] * circuitLengths[len(circuitLengths)-3], nil
+	} else {
+		return p2Answer, nil
 	}
-	fmt.Println()
 }
 
 func main() {
@@ -183,7 +142,7 @@ func main() {
 	ans, err := partOne(lines, 1000)
 	fmt.Printf("Part one: %d\n", ans)
 
-	//ans, err = partTwo(lines)
-	//fmt.Printf("Part two: %d\n", ans)
+	ans, err = partOne(lines, math.MaxInt32)
+	fmt.Printf("Part two: %d\n", ans)
 
 }

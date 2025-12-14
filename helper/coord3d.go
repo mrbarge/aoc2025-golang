@@ -2,7 +2,6 @@ package helper
 
 import (
 	"fmt"
-	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -125,11 +124,11 @@ func (c Coord3D) AdjNeighbours() []Coord3D {
 	}
 }
 
-func (c Coord3D) DistanceTo(i Coord3D) float64 {
+func (c Coord3D) DistanceTo(i Coord3D) int {
 	dx := c.X - i.X
 	dy := c.Y - i.Y
 	dz := c.Z - i.Z
-	return math.Sqrt(float64(dx*dx) + float64(dy*dy) + float64(dz*dz))
+	return dx*dx + dy*dy + dz*dz
 }
 
 func ReadCoord3D(s string) Coord3D {
