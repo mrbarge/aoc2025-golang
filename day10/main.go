@@ -2,10 +2,13 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"slices"
 	"strconv"
 	"strings"
+
+	"gonum.org/v1/gonum/mat"
 
 	"github.com/mrbarge/aoc2025-golang/helper"
 )
@@ -28,6 +31,59 @@ type StateTwo struct {
 }
 
 type Instruction []int
+
+func buildMatrix(machine Machine) ([][]int, []int) {
+	numCounters := len(machine.JoltRequirement)
+	numButtons := len(machine.Instructions)
+	matrix := make([][]int, numCounters)
+	for i := range matrix {
+		matrix[i] = make([]int, numButtons)
+	}
+	for buttonIdx, button := range machine.Instructions {
+		for _, counterIdx := range button {
+			matrix[counterIdx][buttonIdx] = 1
+		}
+	}
+	return matrix, machine.JoltRequirement
+}
+
+func solveWithGonum(matrix [][]int, targets []int) []int {
+	numEquations := len(matrix)
+	numVariables := len(matrix[0])
+
+	// Convert your int matrix to float64 for gonum
+	data := make([]float64, numEquations*numVariables)
+	for i := 0; i < numEquations; i++ {
+		for j := 0; j < numVariables; j++ {
+			data[i*numVariables+j] = float64(matrix[i][j])
+		}
+	}
+
+	// Create gonum matrix
+	A := mat.NewDense(numEquations, numVariables, data)
+
+	// Create target vector
+	fl := make([]float64, len(targets))
+	for i, v := range targets {
+		fl[i] = float64(v)
+	}
+	b := mat.NewVecDense(numEquations, fl)
+
+	// Solve the system A*x = b
+	var x mat.VecDense
+	err := x.SolveVec(A, b)
+	if err != nil {
+		// Handle error - might not have a solution
+	}
+
+	// Extract solution and round to integers
+	solution := make([]int, numVariables)
+	for i := 0; i < numVariables; i++ {
+		solution[i] = int(math.Round(x.AtVec(i)))
+	}
+
+	return solution
+}
 
 func stateAsKey(i []bool) (r string) {
 	r = ""
@@ -171,13 +227,16 @@ func partOne(lines []string) (r int, err error) {
 func partTwo(lines []string) (r int, err error) {
 	machines := readData(lines)
 	for _, machine := range machines {
-		r += machine.SimulateTwo()
+		matrix, _ := buildMatrix(machine)
+		rs := solveWithGonum(matrix, machine.JoltRequirement)
+		r += len(rs)
+		fmt.Printf("Solved machine %v\n", rs)
 	}
 	return r, err
 }
 
 func main() {
-	fh, _ := os.Open("input.txt")
+	fh, _ := os.Open("test.txt")
 	lines, err := helper.ReadLines(fh, true)
 	if err != nil {
 		fmt.Printf("Unable to read input: %v\n", err)

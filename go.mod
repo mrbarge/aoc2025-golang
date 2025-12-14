@@ -3,10 +3,10 @@ module github.com/mrbarge/aoc2025-golang
 go 1.25
 
 require (
-	github.com/albertorestifo/dijkstra v0.0.0-20160910063646-aba76f725f72
-	github.com/emirpasic/gods v1.18.1
+	github.com/mrbarge/aoc2024-golang v0.0.0-20250106120806-2123f3354589
 	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2
+	gonum.org/v1/gonum v0.16.0
 )
 
 require (
@@ -22,5 +22,4 @@ require (
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
 	golang.org/x/tools v0.39.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
